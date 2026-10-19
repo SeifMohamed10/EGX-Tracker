@@ -944,9 +944,9 @@ def cached_sparks(symbols: tuple) -> dict:
 
 
 @st.cache_data(ttl=120, show_spinner=False)
-def cached_movers(ascending: bool, limit: int) -> pd.DataFrame:
+def cached_movers(sort_field: str, ascending: bool, limit: int) -> pd.DataFrame:
     try:
-        return live.scan_market(sort_by="change", ascending=ascending, limit=limit)
+        return live.scan_market(sort_by=sort_field, ascending=ascending, limit=limit)
     except Exception:
         return pd.DataFrame()
 
@@ -1069,8 +1069,8 @@ with tab_chart:
             unsafe_allow_html=True,
         )
 
-    gainers = cached_movers(False, 5)
-    losers = cached_movers(True, 5)
+    gainers = cached_movers("change", False, 5)
+    losers = cached_movers("change", True, 5)
     if not gainers.empty or not losers.empty:
         h2("🚀", "Top movers", "Biggest gainers and losers across the EGX today")
         gcol, lcol = st.columns(2)
@@ -1120,6 +1120,7 @@ with tab_chart:
                 f"(history {float(hist['Close'].iloc[-1]):,.2f} vs live {live_last:,.2f}) - "
                 f"likely an unadjusted split/corporate action. Chart levels may be indicative only."
             )
+    enriched = None
     if hist.empty:
         st.error(
             f"No historical data available for {selected} yet. "
@@ -1154,6 +1155,13 @@ with tab_chart:
             advanced_chart_html(tv_symbol(selected), theme=saved_theme, height=680),
             height=700,
             scrolling=False,
+        )
+    elif enriched is None:
+        st.info(
+            f"Technical chart needs historical data, which isn't ready for {selected} yet "
+            f"({len(hist)} bars). Live prices still work above, and charts build up over "
+            f"coming sessions. Switch the chart style to 'TradingView' in the sidebar for "
+            f"an interactive chart right now."
         )
     else:
         fig = candlestick_chart(
@@ -1712,10 +1720,7 @@ with tab_news:
 
 movers_map = {"Gainers": ("change", False), "Losers": ("change", True), "Volume": ("volume", False)}
 sort_field, ascending = movers_map[movers_sort]
-try:
-    movers = live.scan_market(sort_by=sort_field, ascending=ascending, limit=10)
-except Exception:
-    movers = pd.DataFrame()
+movers = cached_movers(sort_field, ascending, 10)
 if not movers.empty:
     st.divider()
     with st.expander(f"🏆 Market movers — top 10 by {movers_sort.lower()}", expanded=False):
