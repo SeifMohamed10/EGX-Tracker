@@ -4,3 +4,4 @@ egx.db
 .streamlit/secrets.toml
 .venv/
 venv/
+*.log
